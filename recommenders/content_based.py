@@ -37,27 +37,74 @@ from sklearn.feature_extraction.text import CountVectorizer
 # Importing data
 movies = pd.read_csv('resources/data/movies.csv', sep = ',')
 ratings = pd.read_csv('resources/data/ratings.csv')
+imdb = pd.read_csv('resources/imdb_data.csv')
 movies.dropna(inplace=True)
 
-def data_preprocessing(subset_size):
-    """Prepare data for use within Content filtering algorithm.
+# Merging the data
+df_merged = imdb[['movieId','title_cast','director', 'plot_keywords']]
+df_merged = df_merged.merge(movies[['movieId', 'genres', 'title']], on='movieId', how='inner')
+df_merged.head()
 
-    Parameters
-    ----------
-    subset_size : int
-        Number of movies to use within the algorithm.
+# Standadizing the data
+df_merged['title_cast'] = df_merged.title_cast.astype(str)
+df_merged['plot_keywords'] = df_merged.plot_keywords.astype(str)
+df_merged['genres'] = df_merged.genres.astype(str)
+df_merged['director'] = df_merged.director.astype(str)
 
-    Returns
-    -------
-    Pandas Dataframe
-        Subset of movies selected for content-based filtering.
+# Removing spaces between names
+df_merged['director'] = df_merged['director'].apply(lambda x: "".join(x.lower() for x in x.split()))
+df_merged['title_cast'] = df_merged['title_cast'].apply(lambda x: "".join(x.lower() for x in x.split()))
 
-    """
-    # Split genre data into individual words.
-    movies['keyWords'] = movies['genres'].str.replace('|', ' ')
-    # Subset of the data
-    movies_subset = movies[:subset_size]
-    return movies_subset
+# Discarding the pipes between the actors' full names and getting only the first three names
+df_merged['title_cast'] = df_merged['title_cast'].map(lambda x: x.split('|')[:3])
+df_merged['title_cast'] = df_merged['title_cast'].apply(lambda x: ",".join(x))
+
+# Discarding the pipes between the plot keywords' and getting only the first five words
+df_merged['plot_keywords'] = df_merged['plot_keywords'].map(lambda x: x.split('|')[:5])
+df_merged['plot_keywords'] = df_merged['plot_keywords'].apply(lambda x: " ".join(x))
+
+# Discarding the pipes between the genres 
+df_merged['genres'] = df_merged['genres'].map(lambda x: x.lower().split('|'))
+df_merged['genres'] = df_merged['genres'].apply(lambda x: " ".join(x))
+
+
+
+# Creating an empty column and list to store the corpus for each movie
+df_merged['corpus'] = ''
+corpus = []
+
+# List of the columns we want to use to create our corpus 
+columns = ['title_cast', 'director', 'plot_keywords', 'genres']
+
+# For each movie, combine the contents of the selected columns to form its unique corpus 
+for i in range(0, len(df_merged['movieId'])):
+    words = ''
+    for col in columns:
+        # Convert to string before concatenating
+        if col == 'title_cast':
+            words = words + str(df_merged.iloc[i][col]).replace(",", " ") + " "
+        else:
+            words = words + str(df_merged.iloc[i][col]) + " "
+    corpus.append(words)
+
+# Add the corpus information for each movie to the dataframe 
+df_merged['corpus'] = corpus
+df_merged.set_index('movieId', inplace=True)
+
+# Drop the columns we don't need anymore to preserve memory
+df_merged.drop(columns=['title_cast', 'director', 'plot_keywords', 'genres'], inplace=True)
+
+
+count = CountVectorizer()
+count_matrix = count.fit_transform(df_merged['corpus'])
+
+# Creating a similarity score matrix
+cosine_sim = cosine_similarity(count_matrix, count_matrix)
+
+# Print cosine_sim shape
+print(cosine_sim.shape)
+cosine_sim
+
 
 # !! DO NOT CHANGE THIS FUNCTION SIGNATURE !!
 # You are, however, encouraged to change its content.  
@@ -78,35 +125,19 @@ def content_model(movie_list,top_n=10):
         Titles of the top-n movie recommendations to the user.
 
     """
-    # Initializing the empty list of recommended movies
-    recommended_movies = []
-    data = data_preprocessing(27000)
-    # Instantiating and generating the count matrix
-    count_vec = CountVectorizer()
-    count_matrix = count_vec.fit_transform(data['keyWords'])
-    indices = pd.Series(data['title'])
-    cosine_sim = cosine_similarity(count_matrix, count_matrix)
-    # Getting the index of the movie that matches the title
-    idx_1 = indices[indices == movie_list[0]].index[0]
-    idx_2 = indices[indices == movie_list[1]].index[0]
-    idx_3 = indices[indices == movie_list[2]].index[0]
-    # Creating a Series with the similarity scores in descending order
-    rank_1 = cosine_sim[idx_1]
-    rank_2 = cosine_sim[idx_2]
-    rank_3 = cosine_sim[idx_3]
-    # Calculating the scores
-    score_series_1 = pd.Series(rank_1).sort_values(ascending = False)
-    score_series_2 = pd.Series(rank_2).sort_values(ascending = False)
-    score_series_3 = pd.Series(rank_3).sort_values(ascending = False)
-    # Getting the indexes of the 10 most similar movies
-    listings = score_series_1.append(score_series_1).append(score_series_3).sort_values(ascending = False)
-
-    # Store movie names
-    recommended_movies = []
-    # Appending the names of movies
-    top_50_indexes = list(listings.iloc[1:50].index)
-    # Removing chosen movies
-    top_indexes = np.setdiff1d(top_50_indexes,[idx_1,idx_2,idx_3])
-    for i in top_indexes[:top_n]:
-        recommended_movies.append(list(movies['title'])[i])
-    return recommended_movies
+    df1 = df_merged.reset_index()
+    for movie in movie_list:
+        # Extracting movie title
+        title = movie
+        titles = df1[title]
+        indices = pd.Series(df1.index, index=df_merged['title'])
+        idx = indices['title']
+    
+        # Similaryty score
+        sim_scores = list(enumerate(cosine_similarity[idx]))
+        sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+        sim_scores = sim_scores[1:top_n]
+        
+        movie_indices = [i[0] for i in sim_scores]
+ 
+    return titles.iloc[movie_indices]
