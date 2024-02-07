@@ -35,6 +35,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 from PIL import Image
+import plotly.express as px
 
 # Custom Libraries
 from utils.data_loader import load_movie_titles
@@ -78,6 +79,7 @@ def main():
     # DO NOT REMOVE the 'Recommender System' option below, however,
     # you are welcome to add more options to enrich your app.
     page_options = ["Recommender System","Solution Overview","Data Statistics","Movie Database", "Contact Us"]
+
     # -------------------------------------------------------------------
     # ----------- !! THIS CODE MUST NOT BE ALTERED !! -------------------
     # -------------------------------------------------------------------
@@ -203,7 +205,6 @@ def main():
         header("Data Statistics", "User Interactions and Engagement")
         st.subheader("Movie Genre Wordcloud")
         st.markdown("A captivating visualization is presented under the title \"Movie Genre Wordcloud.\" The goal is to provide users with an insightful representation of the distribution of movie genres using a Word Cloud.")
-
         text_data = ' '.join(movies_df['genres'])
         wordcloud = WordCloud(width=800, height=400, background_color="white").generate(text_data)
         st.image(wordcloud.to_image(), caption=f'Word Cloud for Movie Genre', use_column_width=True)
@@ -234,6 +235,7 @@ def main():
         movies_df
         st.subheader("Rating Data")
         ratings_df
+    
     
     if page_selection == "Contact Us":
         header("Contact Us", "Get in Touch")
@@ -275,6 +277,9 @@ def main():
         st.write(f"State: {state}")
         st.write(f"Zip Code: {zip_code}")
         st.write(f"Country: {country}")
+
+    # You may want to add more sections here for aspects such as an EDA,
+    # or to provide your business pitch.
 
 
 if __name__ == '__main__':
