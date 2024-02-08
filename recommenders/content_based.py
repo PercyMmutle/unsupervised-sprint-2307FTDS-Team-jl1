@@ -35,8 +35,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
 
 # Importing data
-movies = pd.read_csv('movies.csv', sep = ',')
-imdb = pd.read_csv('imdb_data.csv')
+movies = pd.read_csv('resources/data/movies.csv', sep = ',')
+imdb = pd.read_csv('resources/data/imdb_data.csv')
 
 # Combining tabels
 df_merged = imdb_data[['movieId','title_cast','director', 'plot_keywords']]
