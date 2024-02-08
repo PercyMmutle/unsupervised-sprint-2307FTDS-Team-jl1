@@ -32,6 +32,7 @@ import pandas as pd
 import numpy as np
 import pickle
 import copy
+import random
 from surprise import Reader, Dataset
 from surprise import SVD, NormalPredictor, BaselineOnly, KNNBasic, NMF
 from sklearn.metrics.pairwise import cosine_similarity
@@ -130,14 +131,14 @@ def collab_model(movie_list,top_n=10):
     user_ratings = pd.merge(movies_df, df_init_users).drop(['genres'], axis=1)
     
     user_ratings = user_ratings.pivot_table(index=['userId'], columns=['title'], values='rating')
-    user_ratings = user_ratings.fillna(0)
+    user_ratings = user_ratings.dropna(thresh=4, axis=1).fillna(0,axis=1)
     similarity = user_ratings.corr(method='pearson')
 
     recommended_movies = pd.DataFrame()
     movie_found = False
     for movie in movie_list:
         try:
-            similar_movies = get_similar_movies(movie, similarity, user_rating=5)
+            similar_movies = get_similar_movies(movie, similarity, user_rating=random.randint(7, 10)/2)
             recommended_movies = recommended_movies.append(similar_movies.reset_index(), ignore_index=True)
             movie_found = True  # Set to True if at least one movie is found
         except KeyError as e:
@@ -150,7 +151,7 @@ def collab_model(movie_list,top_n=10):
 
     # Handle the case where fewer than 10 movies are found
     if len(recommended_movies) < 10:
-        print("Less than 10 movies found. Recommending as many as available.")
+        return movies_df['title'].sample(n=10).tolist()
 
     # Ensure recommended_movies contains exactly 10 movies
     recommended_movies = pd.Series(recommended_movies['title'])
