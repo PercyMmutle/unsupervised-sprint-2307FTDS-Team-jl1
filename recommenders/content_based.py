@@ -28,61 +28,69 @@
 """
 
 # Script dependencies
-# Import Packages
+import os
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import linear_kernel
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import CountVectorizer
 
-# Import Data
-movies_data = pd.read_csv('movies.csv') # Loading movies dataset
-imdb_data = pd.read_csv('imdb_data.csv') # Loading imdb dataset
+# Importing data
+movies = pd.read_csv('movies.csv', sep = ',')
+imdb = pd.read_csv('imdb_data.csv')
 
-
-# Combining tables
+# Combining tabels
 df_merged = imdb_data[['movieId','title_cast','director', 'plot_keywords']]
-df_merged = df_merged.merge(movies_data[['movieId', 'genres', 'title']], on='movieId', how='inner')
+df_merged = df_merged.merge(movies[['movieId', 'genres', 'title']], on='movieId', how='inner')
 
-# Creating a copus
-# Creating an empty column and list to store the corpus for each movie
-df_merged['corpus'] = ''
-corpus = []
+df_merged.dropna(inplace=True)
 
-# List of the columns we want to use to create our corpus 
-columns = ['title_cast', 'director', 'plot_keywords', 'genres']
+def data_preprocessing(subset_size):
+    """Prepare data for use within Content filtering algorithm.
 
-# For each movie, combine the contents of the selected columns to form its unique corpus 
-for i in range(0, df_merged.shape[0]):
-    words = ''
-    for col in columns:
+    Parameters
+    ----------
+    subset_size : int
+        Number of movies to use within the algorithm.
+
+    Returns
+    -------
+    Pandas Dataframe
+        Subset of movies selected for content-based filtering.
+
+    """
+    #Creating a corpus
+    
+    
+    df_merged['corpus'] = ''
+    corpus = []
+
+    # List of the columns we want to use to create our corpus 
+    columns = ['title_cast', 'director', 'plot_keywords', 'genres']
+
+    # For each movie, combine the contents of the selected columns to form its unique corpus 
+    for i in range(0, df_merged.shape[0]):
+        words = ''
+        for col in columns:
         # Convert to string before concatenating
-        if col == 'title_cast':
-            words = words + str(df_merged.iloc[i][col]).replace(",", " ") + " "
-        else:
-            words = words + str(df_merged.iloc[i][col]) + " "
-    corpus.append(words)
+            if col == 'title_cast':
+                 words = words + str(df_merged.iloc[i][col]).replace(",", " ") + " "
+            else:
+                 words = words + str(df_merged.iloc[i][col]) + " "
+        corpus.append(words)
 
 # Add the corpus information for each movie to the dataframe 
-df_merged['corpus'] = corpus
-df_merged.set_index('movieId', inplace=True)
+    df_merged['corpus'] = corpus
+    df_merged.set_index('movieId', inplace=True)
 
 # Drop the columns we don't need anymore to preserve memory
-df_merged.drop(columns=['title_cast', 'director', 'plot_keywords', 'genres'], inplace=True)
+    df_merged.drop(columns=['title_cast', 'director', 'plot_keywords', 'genres'], inplace=True)
+    
+    df_merged['corpus'] = df_merged['corpus'].str.replace('|', ' ')
+    
 
-# Create a TfidfVectorizer and Remove stopwords
-tfidf = TfidfVectorizer(stop_words='english')
-# Fit and transform the data to a tfidf matrix
-tfidf_matrix = tfidf.fit_transform(df_merged['corpus'])
-
-
-
-# Compute the cosine similarity between each movie description
-cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
-
-
-#-----------------------------------------------------------------------------------------------------------------------
-# Creating a function 
-indices = pd.Series(df_merged.index, index=df_merged['title']).drop_duplicates()
-
+# Subset of the data
+    movies_subset = df_merged[:subset_size]
+    return movies_subset
 
 # !! DO NOT CHANGE THIS FUNCTION SIGNATURE !!
 # You are, however, encouraged to change its content.  
@@ -103,15 +111,43 @@ def content_model(movie_list,top_n=10):
         Titles of the top-n movie recommendations to the user.
 
     """
-    title = movie_list[0]
-    idx = indices[title]
-# Get the pairwsie similarity scores of all movies with that movie
-    sim_scores = list(enumerate(cosine_sim[idx]))
-# Sort the movies based on the similarity scores
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-# Get the scores of the 10 most similar movies
-    top_similar = sim_scores[1:num_recommend+1]
-# Get the movie indices
-    movie_indices = [i[0] for i in top_similar]
-# Return the top 10 most similar movies
-    return df_merged['title'].iloc[movie_indices]
+    # Initializing the empty list of recommended movies
+    recommended_movies = []
+    data = data_preprocessing(27000)
+    # Instantiating and generating the count matrix
+    count_vec = CountVectorizer()
+    count_matrix = count_vec.fit_transform(data['corpus'])
+    indices = pd.DataFrame(data['title'])
+    cosine_sim = cosine_similarity(count_matrix, count_matrix)
+    # Getting the index of the movie that matches the title
+    idx_1 = indices[indices == movie_list[0]].index[0]
+    idx_2 = indices[indices == movie_list[1]].index[0]
+    idx_3 = indices[indices == movie_list[2]].index[0]
+    # Creating a Series with the similarity scores in descending order
+    rank_1 = cosine_sim[idx_1]
+    rank_2 = cosine_sim[idx_2]
+    rank_3 = cosine_sim[idx_3]
+    
+    score_series = rank_1 + rank_2 +rank_3
+    # Calculating the scores
+    #score_series_1 = pd.DataFrame(rank_1)
+    #score_series_2 = pd.DataFrame(rank_2)
+    #score_series_3 = pd.DataFrame(rank_3)
+    #column = score_series_1.columns
+    # Getting the indexes of the 10 most similar movies
+    #series_4 = score_series_1.append(score_series_2)
+    #listings = series_4.append(score_series_3).sort_values(by = column, ascending = False)
+    listings = pd.Series(score_series).sort_values(ascending=False)
+    # Store movie names
+    recommended_movies = []
+    # Appending the names of movies
+    top_50_indexes = (listings.iloc[1:50].index).to_list()
+    # Removing chosen movies
+    top_indexes = np.setdiff1d(top_50_indexes,[idx_1,idx_2,idx_3])
+    for i in top_indexes[:top_n]:
+        if (movies['title'])[i] in movie_list:
+            (movies['title'])[i]
+            top_n = top_n+1
+        else:
+            recommended_movies.append((movies['title'])[i])
+    return recommended_movies
