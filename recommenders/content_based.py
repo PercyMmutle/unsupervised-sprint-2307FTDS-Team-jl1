@@ -36,18 +36,12 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 # Importing data
 movies = pd.read_csv('resources/data/movies.csv', sep = ',')
-imdb = pd.read_csv('resources/data/imdb_data.csv')
-
-# Combining tabels
-df_merged = imdb[['movieId','title_cast','director', 'plot_keywords']]
-df_merged = df_merged.merge(movies[['movieId', 'genres', 'title']], on='movieId', how='inner')
-
-df_merged.dropna(inplace=True)
+ratings = pd.read_csv('resources/data/ratings.csv')
+movies.dropna(inplace=True)
 
 def data_preprocessing(subset_size):
-    """Prepare data for use within Content filtering algorithm.
-
-    Parameters
+    """Prepare data for use within Content filtering algorithm. 
+       Parameters
     ----------
     subset_size : int
         Number of movies to use within the algorithm.
@@ -60,36 +54,11 @@ def data_preprocessing(subset_size):
     """
     #Creating a corpus
     
-    
-    df_merged['corpus'] = ''
-    corpus = []
-
-    # List of the columns we want to use to create our corpus 
-    columns = ['title_cast', 'director', 'plot_keywords', 'genres']
-
-    # For each movie, combine the contents of the selected columns to form its unique corpus 
-    for i in range(0, df_merged.shape[0]):
-        words = ''
-        for col in columns:
-        # Convert to string before concatenating
-            if col == 'title_cast':
-                 words = words + str(df_merged.iloc[i][col]).replace(",", " ") + " "
-            else:
-                 words = words + str(df_merged.iloc[i][col]) + " "
-        corpus.append(words)
-
-# Add the corpus information for each movie to the dataframe 
-    df_merged['corpus'] = corpus
-    df_merged.set_index('movieId', inplace=True)
-
-# Drop the columns we don't need anymore to preserve memory
-    df_merged.drop(columns=['title_cast', 'director', 'plot_keywords', 'genres'], inplace=True)
-    
-    df_merged['corpus'] = df_merged['corpus'].str.replace('|', ' ')
+    movies['keyWords'] = movies['genres'].str.replace('|', ' ')
     
 
 # Subset of the data
-    movies_subset = df_merged[:subset_size]
+    movies_subset = movies[:subset_size]
     return movies_subset
 
 # !! DO NOT CHANGE THIS FUNCTION SIGNATURE !!
@@ -116,7 +85,7 @@ def content_model(movie_list,top_n=10):
     data = data_preprocessing(27000)
     # Instantiating and generating the count matrix
     count_vec = CountVectorizer()
-    count_matrix = count_vec.fit_transform(data['corpus'])
+    count_matrix = count_vec.fit_transform(data['keyWords'])
     indices = pd.DataFrame(data['title'])
     cosine_sim = cosine_similarity(count_matrix, count_matrix)
     # Getting the index of the movie that matches the title
