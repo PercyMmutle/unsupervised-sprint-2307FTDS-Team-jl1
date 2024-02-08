@@ -39,7 +39,7 @@ movies = pd.read_csv('resources/data/movies.csv', sep = ',')
 imdb = pd.read_csv('resources/data/imdb_data.csv')
 
 # Combining tabels
-df_merged = imdb_data[['movieId','title_cast','director', 'plot_keywords']]
+df_merged = imdb[['movieId','title_cast','director', 'plot_keywords']]
 df_merged = df_merged.merge(movies[['movieId', 'genres', 'title']], on='movieId', how='inner')
 
 df_merged.dropna(inplace=True)
